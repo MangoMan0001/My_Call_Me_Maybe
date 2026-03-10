@@ -1,21 +1,11 @@
 # ==========================================
-#  Fly_in Project Makefile
+#  Call_Me_Maybe Project Makefile
 # ==========================================
-
-# 実行するPythonコマンド
-PYTHON_EXEC = python3
 
 # プロジェクト名とメインスクリプト
 NAME        = call_me_maybe
 MAIN_SCRIPT = call_me_maybe.py
 
-# 仮想環境の設定
-UV        	= uv
-PYTHON      = $(VENV)/bin/python3
-PY_VERSION  = python3
-
-# 依存パッケージ
-REQUIREMENTS = requirements.txt
 
 # lint option
 MYPY_OPTION = --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
@@ -33,10 +23,8 @@ all: install
 # ------------------------------------------
 install: ## 仮想環境を作成し、依存関係をインストールする
 	@echo "Creating virtual environment..."
-	$(PY_VERSION) -m venv $(VENV)
 	@echo "Installing dependencies..."
-	$(PIP) install --upgrade pip
-	$(PIP) install -r $(REQUIREMENTS)
+	uv sync
 	@echo "Setup complete! Run 'make run' to start."
 
 # ------------------------------------------
@@ -44,28 +32,26 @@ install: ## 仮想環境を作成し、依存関係をインストールする
 # ------------------------------------------
 run: ## メインプログラムを実行
 	@echo "Running $(NAME)..."
-	@if [ ! -d "$(VENV)" ]; then echo "Venv not found. Run 'make install' first."; exit 1; fi
-	@$(PYTHON) $(MAIN_SCRIPT) $(MAP_FILE)
+	uv run python &(MAIN_SCRIPT)
 
 debug: ## pdbデバッガを使って実行
 	@echo "Debugging $(NAME)..."
-	@if [ ! -d "$(VENV)" ]; then echo "Venv not found. Run 'make install' first."; exit 1; fi
-	@$(PYTHON) -m pdb $(MAIN_SCRIPT) $(MAP_FILE)
+	uv run python -pdb &(MAIN_SCRIPT)
 
 # ------------------------------------------
 #  Quality Control
 # ------------------------------------------
 lint: ## Flake8とMypyによる静的解析を実行
 	@echo "Running Linter (Standard)..."
-	@if [ ! -d "$(VENV)" ]; then echo "Venv not found. Run 'make install' first."; exit 1; fi
-	$(PYTHON) -m flake8 .
-	$(PYTHON) -m mypy $(MYPY_OPTION) .
+	uv run ruff check .
+	uv run flake8 .
+	uv run mypy .
 
 lint-strict: ## より厳しいMypyチェックを実行
 	@echo "Running Linter (Strict)..."
-	@if [ ! -d "$(VENV)" ]; then echo "Venv not found. Run 'make install' first."; exit 1; fi
-	$(PYTHON) -m flake8 .
-	$(PYTHON) -m mypy . --strict
+	uv run ruff check .
+	uv run flake8 .
+	uv run mypy --strict .
 
 # ------------------------------------------
 #  Cleanup
@@ -79,11 +65,12 @@ clean: ## 一時ファイルやキャッシュを削除
 	@rm -rf dist
 	@rm -rf build
 	@rm -rf *.egg-info
+	@rm -rf .ruff_cache
 	@echo "Clean complete."
 
 fclean: clean ## cleanに加えて仮想環境も削除
 	@echo "Full Cleaning up..."
-	@rm -rf $(VENV)
+	@rm -rf .venv
 	@echo "Full Clean complete."
 
-re: clean all
+re: fclean all

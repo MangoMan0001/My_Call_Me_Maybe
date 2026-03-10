@@ -1,7 +1,13 @@
 [project]
-name = "my-call-me-maybe"
+name = "call-me-maybe"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "flake8>=7.3.0",
+    "mypy>=1.19.1",
+    "numpy>=2.4.3",
+    "pep8-naming>=0.15.1",
+    "pydantic>=2.12.5",
+]

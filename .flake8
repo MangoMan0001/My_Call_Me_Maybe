@@ -1,0 +1,3 @@
+[flake8]
+docstring-convention = google
+exclude = .git, __pycache__, .venv, data, lim_sdk
