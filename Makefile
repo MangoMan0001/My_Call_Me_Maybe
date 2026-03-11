@@ -6,10 +6,6 @@
 NAME        = call_me_maybe
 MAIN_SCRIPT = call_me_maybe.py
 
-
-# lint option
-MYPY_OPTION = --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
-
 # ==========================================
 #  Rules
 # ==========================================
@@ -43,13 +39,11 @@ debug: ## pdbデバッガを使って実行
 # ------------------------------------------
 lint: ## Flake8とMypyによる静的解析を実行
 	@echo "Running Linter (Standard)..."
-	uv run ruff check .
 	uv run flake8 .
 	uv run mypy .
 
 lint-strict: ## より厳しいMypyチェックを実行
 	@echo "Running Linter (Strict)..."
-	uv run ruff check .
 	uv run flake8 .
 	uv run mypy --strict .
 

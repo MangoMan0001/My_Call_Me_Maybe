@@ -1,8 +1,0 @@
-pydantic
-flake8
-mypy
-numpy
-
-pep8-naming
-flake8-docstrings
-flake8-bugbear
