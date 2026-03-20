@@ -1,41 +1,75 @@
 #!usr/bin/env python3
 
 import json
-from llm_sdk.__init__ import Small_LLM_Model
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath("llm_sdk"))
+
+from llm_sdk import Small_LLM_Model
+
+TARGET_TOKEN = ['{', '}']
 
 def main() -> None:
-    print("🤖 モデルをロードしていますわ...（初回はダウンロードが入るかもしれません）")
+    print("🤖 モデルをロード...")
     model = Small_LLM_Model()
 
-    # 1. LLMが知っている全単語の「辞書（ボキャブラリー）」を読み込みますわ
+    # 辞書作成
     vocab_path = model.get_path_to_vocab_file()
     with open(vocab_path, 'r', encoding='utf-8') as f:
         vocab = json.load(f)
-
-    # IDから文字（トークン）を引けるように「逆引き辞書」を作りますの
     id_to_token = {v: k for k, v in vocab.items()}
 
-    # 2. 課題にあるテストプロンプトを用意しますわ
-    prompt = "What is the sum of 2 and 3?"
-    print(f"\n📝 プロンプト: '{prompt}'")
+    # 1. テストプロンプトを用意
+    # prompt = "What is the sum of 2 and 3?"
+    prompt = "２と３を足したら？"
+    print(f"\n📝 初期プロンプト: '{prompt}'")
 
-    # 3. プロンプトをAIが読める「数字（トークンID）」の配列に変換しますわ
-    # （※_tokenizerはSmall_LLM_Modelの内部変数ですの）
-    input_ids = model._tokenizer.encode(prompt)
-    print(f"🔢 変換された入力ID: {input_ids}")
+    eos_token_id = model._tokenizer.eos_token_id
+    print(f"🛑 このモデルの終了フラグID: {eos_token_id}")
 
-    # 4. LLMに「次に来る言葉のスコア（Logits）」を出させますわ！
-    logits = model.get_logits_from_input_ids(input_ids)
-    print(f"📊 スコア配列の長さ（全語彙数）: {len(logits)}")
+    target_id = [int(model.encode(token)[0]) for token in TARGET_TOKEN]
+    print(f"target_token {TARGET_TOKEN}")
+    print(f"target_id: {target_id}")
+    print(type(model.encode('{')))
 
-    # 5. スコアが高い順に並べ替えて、トップ5を表示してみましょう！
-    top_indices = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)[:5]
+    ids = model._tokenizer.encode(prompt)
 
-    print("\n🏆 --- 次に来る確率が高いトークン Top 5 ---")
-    for idx in top_indices:
-        token_str = id_to_token.get(idx, "???")
-        score = logits[idx]
-        print(f"ID: {idx:6} | スコア: {score:7.2f} | トークン: '{token_str}'")
+    for step in range(30):
+        prompt = model.decode(ids)
+        print(f"\n📝 現在プロンプト: '{prompt}'")
+
+        # 4. LLMに「次に来る言葉のスコア（Logits）」を要求
+        logits = model.get_logits_from_input_ids(ids)
+
+        # 5. スコアが高い順に並べ替えて、トップ5を表示
+        top_indices = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)[:5]
+
+        print("\n🏆 --- 次に来る確率が高いトークン Top 5 ---")
+        for idx in top_indices:
+            token_str = model.decode([idx])
+            score = logits[idx]
+            print(f"ID: {idx:6} | スコア: {score:7.2f} | トークン: '{token_str}'")
+
+        for i in range(len(logits)):
+            if i not in target_id:
+                logits[i] = -float('inf')
+
+        # 2. 一番スコアが高い「次の一文字（ID）」を決める
+        next_token_id = logits.index(max(logits))
+
+        # 一番スコアが高い「次の一文字（ID）」を文字にする
+        next_token = model.decode([next_token_id])
+        print(f"選択されたtoken: {next_token}")
+
+        # 3. 💥 終了判定！ 出てきたIDが終了フラグだったらループを抜ける！
+        if next_token_id == eos_token_id:
+            print("\n✨ AI「これで私のお話は終わりですわ！」")
+            break
+
+        # 4. 終了じゃなければ、出力済みの配列に付け足して、次のループへ！
+        ids.append(next_token_id)
+        print(model.decode([next_token_id]), end="", flush=True)
 
 if __name__ == "__main__":
     main()

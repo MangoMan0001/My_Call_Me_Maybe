@@ -65,6 +65,7 @@ clean: ## 一時ファイルやキャッシュを削除
 fclean: clean ## cleanに加えて仮想環境も削除
 	@echo "Full Cleaning up..."
 	@rm -rf .venv
+	@rm -rf ~/.cache/huggingface/hub/
 	@echo "Full Clean complete."
 
 re: fclean all
