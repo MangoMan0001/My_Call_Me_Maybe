@@ -28,11 +28,11 @@ install: ## 仮想環境を作成し、依存関係をインストールする
 # ------------------------------------------
 run: ## メインプログラムを実行
 	@echo "Running $(NAME)..."
-	uv run python &(MAIN_SCRIPT)
+	uv run python $(MAIN_SCRIPT)
 
 debug: ## pdbデバッガを使って実行
 	@echo "Debugging $(NAME)..."
-	uv run python -pdb &(MAIN_SCRIPT)
+	uv run python -pdb $(MAIN_SCRIPT)
 
 # ------------------------------------------
 #  Quality Control
