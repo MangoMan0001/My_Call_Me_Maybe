@@ -21,6 +21,7 @@ class LimitationModel():
             vocab = json.load(f)
         self.token_to_id = vocab
         self.id_to_token = {v: k for k, v in vocab.items()}
+        self.output: list[dict[str, str | int]] = []
 
         self._get_fn_tokens()
         self._gen_prompt()
@@ -73,13 +74,16 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
                 for key, value in fn['parameters'].items():
                     params[key] = value['type']
         for i, (key, value) in enumerate(params.items(), 1):
-            text.append(f'{key}": {value})')
+            text.append(f'{key}": {value}')
             if i < len(params):
                 text.append(', "')
 
         text.append('}\n}')
         encode_text = self.model.encode("".join(text)).tolist()[0]
         self.post_funtion_ouput: list[int] = encode_text
+        # for token in self.post_funtion_ouput:
+        #     print(self.model.decode([token]))
+        # sys.exit(1)
 
     def _gen_param_tokens(self) -> None:
         self._gen_num_tokens()
@@ -100,8 +104,14 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
                 self.str_tokens.append(id)
 
     def run(self) -> None:
-        for prompt in self.main_prompts:
-            self._run_model(prompt)
+        for main_prompt, prompt in zip(self.main_prompts, self.inputs):
+            self._run_model(main_prompt)
+            self._gen_output(prompt)
+            for object in self.output:
+                print(type(object))
+                print(object)
+            print(self.output)
+            sys.exit(1)
             print(self.model.decode(self.current_result))
             sys.exit(1)
 
@@ -158,7 +168,7 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
 
     def _status_manager(self) -> Generator[list[int], int, None]:
         for token in self.pre_funtion_ouput:
-            _ = yield [token]
+            chosen_token = yield [token]
 
         possible_paths = self.fn_tokens.copy()
         while possible_paths:
@@ -176,17 +186,18 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
                               if len(path) > 1]
 
         self._gen_post_output()
-        prev_tokens: list[int] = []
+        prev_tokens: list[int] = [self.post_funtion_ouput[0]]
         iter_post_output = iter(self.post_funtion_ouput)
         for token in iter_post_output:
             # number
-            if (self.model.decode(prev_tokens) == '":' and
+            if (self.model.decode([prev_tokens[-1]]) == '":' and
                     self.model.decode([token]) == ' number'):
                 next_token = next(iter_post_output)
                 while True:
                     chosen_token = yield self.num_tokens + [next_token]
                     if chosen_token == next_token:
                         break
+                continue
             # string
             if (self.model.decode(prev_tokens) == '":' and
                     self.model.decode([token]) == 'string'):
@@ -197,6 +208,7 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
                     chosen_token = yield str_tokens
                     if chosen_token == self.dquote_tokens[0]:
                         break
+                continue
             # bool
             if (self.model.decode(prev_tokens) == '":' and
                     self.model.decode([token]) == 'boolean'):
@@ -216,13 +228,23 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
                     # 各boolリストの先頭を削除
                     possible_paths = [path[1:] for path in left_tokens
                                       if len(path) > 1]
-
+                continue
             # null
             if (self.model.decode(prev_tokens) == '":' and
                     self.model.decode([token]) == 'null'):
                 null_tokens = self.model.encode('"null"').tolist()[0]
                 for token in null_tokens:
                     _ = yield [token]
+                continue
 
             prev_token = yield [token]
             prev_tokens.append(prev_token)
+
+    def _gen_output(self, prompt: str) -> None:
+        model_result = json.loads(
+            "".join(self.model.decode(self.current_result)))
+        json_object: dict[str, str | int] = {
+            "prompt": prompt,
+            **model_result
+        }
+        self.output.append(json_object)
