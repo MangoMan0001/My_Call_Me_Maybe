@@ -19,6 +19,7 @@ class LimitationModel():
         vocab_path = self.model.get_path_to_vocab_file()
         with open(vocab_path, 'r', encoding='utf-8') as f:
             vocab = json.load(f)
+        self.token_to_id = vocab
         self.id_to_token = {v: k for k, v in vocab.items()}
 
         self._get_fn_tokens()
@@ -81,8 +82,15 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
         self.post_funtion_ouput: list[int] = encode_text
 
     def _gen_param_tokens(self) -> None:
-        nm = ['-', '']
-        self.num_tokens =
+        self._gen_num_tokens()
+
+
+    def _gen_num_tokens(self) -> None:
+        nm = ['-', '.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+        self.num_tokens = [self.token_to_id[token] for token in nm]
+        for token in self.num_tokens:
+            print(self.model.decode(token))
+        sys.exit(1)
 
     def run(self) -> None:
         for prompt in self.main_prompts:
@@ -159,11 +167,11 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
             # 各関数リストの先頭を削除
             possible_paths = [path[1:] for path in left_tokens
                               if len(path) > 1]
+
         self._gen_post_output()
-        prev_tokens: list[int] = []
-        for token in self.post_funtion_ouput:
-            if self.model.decode(prev_tokens) == '":' and self.model.decode([token]) == 'number':
+        # prev_tokens: list[int] = []
+        # for token in self.post_funtion_ouput:
+        #     if self.model.decode(prev_tokens) == '":' and self.model.decode([token]) == 'number':
 
-
-            prev_token = yield [token]
-            prev_tokens.append(prev_token)
+        #     prev_token = yield [token]
+        #     prev_tokens.append(prev_token)
