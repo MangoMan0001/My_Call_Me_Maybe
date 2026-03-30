@@ -83,14 +83,21 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
 
     def _gen_param_tokens(self) -> None:
         self._gen_num_tokens()
-
+        self._gen_str_tokens()
 
     def _gen_num_tokens(self) -> None:
         nm = ['-', '.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
         self.num_tokens = [self.token_to_id[token] for token in nm]
-        for token in self.num_tokens:
-            print(self.model.decode(token))
-        sys.exit(1)
+
+    def _gen_str_tokens(self) -> None:
+        self.str_tokens: list[int] = []
+        self.dquote_tokens: list[int] = []
+        for id, token in self.id_to_token.items():
+            if '"' in token:
+                if token == '"':
+                    self.dquote_tokens.append(id)
+            else:
+                self.str_tokens.append(id)
 
     def run(self) -> None:
         for prompt in self.main_prompts:
@@ -169,9 +176,53 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
                               if len(path) > 1]
 
         self._gen_post_output()
-        # prev_tokens: list[int] = []
-        # for token in self.post_funtion_ouput:
-        #     if self.model.decode(prev_tokens) == '":' and self.model.decode([token]) == 'number':
+        prev_tokens: list[int] = []
+        iter_post_output = iter(self.post_funtion_ouput)
+        for token in iter_post_output:
+            # number
+            if (self.model.decode(prev_tokens) == '":' and
+                    self.model.decode([token]) == ' number'):
+                next_token = next(iter_post_output)
+                while True:
+                    chosen_token = yield self.num_tokens + [next_token]
+                    if chosen_token == next_token:
+                        break
+            # string
+            if (self.model.decode(prev_tokens) == '":' and
+                    self.model.decode([token]) == 'string'):
+                _ = yield self.dquote_tokens
 
-        #     prev_token = yield [token]
-        #     prev_tokens.append(prev_token)
+                str_tokens = self.str_tokens + self.dquote_tokens
+                while True:
+                    chosen_token = yield str_tokens
+                    if chosen_token == self.dquote_tokens[0]:
+                        break
+            # bool
+            if (self.model.decode(prev_tokens) == '":' and
+                    self.model.decode([token]) == 'boolean'):
+                possible_paths = (self.model.encode('"true"').tolist()[0] +
+                                  self.model.encode('"false"').tolist()[0])
+                while possible_paths:
+                    # 各boolトークンリストの先頭のみ抜粋
+                    allowed_token = list(set(path[0]
+                                             for path in possible_paths))
+
+                    chosen_token = yield allowed_token
+
+                    # 選ばれなかったトークンから始まるboolをリストから除外
+                    left_tokens = [path for path in possible_paths
+                                   if path[0] == chosen_token]
+
+                    # 各boolリストの先頭を削除
+                    possible_paths = [path[1:] for path in left_tokens
+                                      if len(path) > 1]
+
+            # null
+            if (self.model.decode(prev_tokens) == '":' and
+                    self.model.decode([token]) == 'null'):
+                null_tokens = self.model.encode('"null"').tolist()[0]
+                for token in null_tokens:
+                    _ = yield [token]
+
+            prev_token = yield [token]
+            prev_tokens.append(prev_token)
