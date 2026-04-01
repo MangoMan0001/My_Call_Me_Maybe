@@ -95,28 +95,49 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
 
     def _gen_str_tokens(self) -> None:
         self.str_tokens: list[int] = []
-        self.dquote_tokens: list[int] = []
+        self.dquote_token: list[int] = []
+        self.str_end_token_1: list[int] = []
+        self.str_end_token_2: list[int] = []
         for id, token in self.id_to_token.items():
-            if '"' in token:
-                if token == '"':
-                    self.dquote_tokens.append(id)
+            if '"' == token:
+                self.dquote_token.append(id)
+            # elif token == '"}':
+            #     self.str_end_token_1.append(id)
+            # elif token == '",':
+            #     self.str_end_token_2.append(id)
             else:
                 self.str_tokens.append(id)
+        # for id, token in self.id_to_token.items():
+        #     if '"' in token:
+        #         if token == '"':
+        #             self.dquote_tokens.append(id)
+        #     else:
+        #         self.str_tokens.append(id)
 
     def run(self) -> None:
-        for main_prompt, prompt in zip(self.main_prompts, self.inputs):
-            self._run_model(main_prompt)
-            self._gen_output(prompt)
+        try:
+            for main_prompt, prompt in zip(self.main_prompts, self.inputs):
+                print('-------- run --------')
+                self._run_model(main_prompt)
+                self._gen_output(prompt)
+                for object in self.output:
+                    print(object)
+                print(self.model.decode(self.current_result))
+                print(json.dumps(self.output, indent=4))
+                print('---------------------')
+                print()
+                # sys.exit(1)
+        except Exception as e:
+            print(e)
             for object in self.output:
-                print(type(object))
                 print(object)
-            print(self.output)
-            sys.exit(1)
             print(self.model.decode(self.current_result))
+            print(json.dumps(self.output, indent=4))
             sys.exit(1)
 
     def _run_model(self, prompt: str) -> None:
         self.current_result: list[int] = []
+        tokens: list[int] = []
         tokens = self.model.encode(prompt).tolist()[0]
 
         state_gen = self._status_manager()
@@ -127,9 +148,14 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
             return
         while True:
             # logitsを要求
+            print('logitsを要求')
             logits = self.model.get_logits_from_input_ids(tokens)
 
+            print('arryに')
+            # logits_arr = np.array(logits)
             # ソートで昇順に
+            # top_indices = np.argsort(logits_arr)[-5:][::-1]
+
             top_indices = sorted(range(len(logits)),
                                  key=lambda i: logits[i], reverse=True)[:5]
 
@@ -140,6 +166,7 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
                 print(f"ID: {idx:6} | スコア: {score:7.2f} | トークン: '{token_str}'")
 
             # 状態分けでlogitsの中身を変更
+            print('状態分けでlogitsの中身を変更')
             original = np.array(logits)
             masked = np.full_like(original, -np.inf)
             masked[allowed_tokens] = original[allowed_tokens]
@@ -148,6 +175,8 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
             # ソートで昇順に
             top_indices = sorted(range(len(logits)),
                                  key=lambda i: logits[i], reverse=True)[:5]
+
+            # top_indices = np.argsort(masked)[-5:][::-1]
             print("\n--- postトークン ---")
             for idx in top_indices:
                 token_str = self.model.decode([idx])
@@ -155,15 +184,20 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
                 print(f"ID: {idx:6} | スコア: {score:7.2f} | トークン: '{token_str}'")
 
             # 一番スコアが高い「次の一文字（ID）」を決める
+            print('一番スコアが高い「次の一文字（ID）」を決める')
             next_token_id = logits.index(max(logits))
+            # next_token_id = int(np.argmax(masked))
             self.current_result.append(next_token_id)
 
+            # トークンを選択
+            print('トークンを選択')
             try:
                 allowed_tokens = state_gen.send(next_token_id)
             except StopIteration:
                 break
 
             # 終了じゃなければ、出力済みの配列に付け足して、次のループへ！
+            print('終了じゃなければ、出力済みの配列に付け足して、次のループへ！')
             tokens.append(next_token_id)
 
     def _status_manager(self) -> Generator[list[int], int, None]:
@@ -188,6 +222,10 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
         self._gen_post_output()
         prev_tokens: list[int] = [self.post_funtion_ouput[0]]
         iter_post_output = iter(self.post_funtion_ouput)
+        # for token in self.post_funtion_ouput:
+        #     print(self.model.decode([token]))
+        # print(self.model.decode(self.current_result))
+        # sys.exit(1)
         for token in iter_post_output:
             # number
             if (self.model.decode([prev_tokens[-1]]) == '":' and
@@ -199,19 +237,23 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
                         break
                 continue
             # string
-            if (self.model.decode(prev_tokens) == '":' and
-                    self.model.decode([token]) == 'string'):
-                _ = yield self.dquote_tokens
+            if (self.model.decode([prev_tokens[-1]]) == '":' and
+                    self.model.decode([token]) == ' string'):
+                _ = yield self.dquote_token
 
-                str_tokens = self.str_tokens + self.dquote_tokens
+                str_tokens = self.str_tokens + self.dquote_token
                 while True:
                     chosen_token = yield str_tokens
-                    if chosen_token == self.dquote_tokens[0]:
+                    if chosen_token == self.dquote_token[0]:
+                        break
+                    elif ('",' in self.model.decode([chosen_token]) or
+                          '"}' in self.model.decode([chosen_token])):
+                        next(iter_post_output)
                         break
                 continue
             # bool
-            if (self.model.decode(prev_tokens) == '":' and
-                    self.model.decode([token]) == 'boolean'):
+            if (self.model.decode([prev_tokens[-1]]) == '":' and
+                    self.model.decode([token]) == ' boolean'):
                 possible_paths = (self.model.encode('"true"').tolist()[0] +
                                   self.model.encode('"false"').tolist()[0])
                 while possible_paths:
@@ -230,8 +272,8 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
                                       if len(path) > 1]
                 continue
             # null
-            if (self.model.decode(prev_tokens) == '":' and
-                    self.model.decode([token]) == 'null'):
+            if (self.model.decode([prev_tokens[-1]]) == '":' and
+                    self.model.decode([token]) == ' null'):
                 null_tokens = self.model.encode('"null"').tolist()[0]
                 for token in null_tokens:
                     _ = yield [token]
@@ -240,11 +282,11 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
             prev_token = yield [token]
             prev_tokens.append(prev_token)
 
-    def _gen_output(self, prompt: str) -> None:
+    def _gen_output(self, prompt: dict[str, str]) -> None:
         model_result = json.loads(
             "".join(self.model.decode(self.current_result)))
         json_object: dict[str, str | int] = {
-            "prompt": prompt,
+            **prompt,
             **model_result
         }
         self.output.append(json_object)

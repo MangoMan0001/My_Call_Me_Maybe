@@ -16,15 +16,16 @@ dependencies = [
 # flake8-docstrings　後で入れる
 
 # PyTorchのCPU版をインストール
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
+# [[tool.uv.index]]
+# name = "pytorch-cpu"
+# url = "https://download.pytorch.org/whl/cpu"
+# explicit = true
 
 [tool.uv.sources]
-torch = { index = "pytorch-cpu" }
+# torch = { index = "pytorch-cpu" }
 llm-sdk = { workspace = true }
 
+# llm_sdkの中のpyproject.tomlの内容も含める
 [tool.uv.workspace]
 members = [
     "llm_sdk",
