@@ -30,6 +30,10 @@ run: ## メインプログラムを実行
 	@echo "Running $(NAME)..."
 	uv run python $(MAIN_SCRIPT)
 
+edge: ## メインプログラムを実行
+	@echo "Running $(NAME)..."
+	uv run python $(MAIN_SCRIPT) -f edge_functions.json -i edge_inputs.json
+
 debug: ## pdbデバッガを使って実行
 	@echo "Debugging $(NAME)..."
 	uv run python -pdb $(MAIN_SCRIPT)

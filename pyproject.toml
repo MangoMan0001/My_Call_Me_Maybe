@@ -33,6 +33,10 @@ members = [
 
 
 [tool.mypy]
+exclude = [
+    "^llm_sdk/",
+    "^\\.venv/",
+]
 # .関数はAnyで返せなくなる
 warn_return_any = true
 

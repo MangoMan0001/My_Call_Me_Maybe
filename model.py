@@ -4,8 +4,9 @@ import argparse
 import json
 import sys
 import numpy as np
-from llm_sdk import Small_LLM_Model
+from llm_sdk import Small_LLM_Model  # type: ignore
 from typing import Generator
+from pathlib import Path
 
 
 class LimitationModel():
@@ -15,6 +16,7 @@ class LimitationModel():
 
         self.functions = json.loads(f_text)
         self.inputs = json.loads(i_text)
+        self.output_path: Path = args.output
         self.model = Small_LLM_Model()
         vocab_path = self.model.get_path_to_vocab_file()
         with open(vocab_path, 'r', encoding='utf-8') as f:
@@ -39,24 +41,27 @@ class LimitationModel():
         self.main_prompts: list[str] = []
 
         for prompt in self.inputs:
-            self.main_prompts.append(
-                f"""You are a strict AI assistant designed for function calling.
-Your task is to analyze the user's prompt and generate a JSON object to call the correct function.
-
-[Available Functions]
-{json.dumps(self.functions, indent=2)}
-
-[Rules]
-1. You MUST choose one of the available functions.
-2. You MUST extract the required parameters based on the function's definition.
-3. You MUST respond ONLY with a valid JSON object. No markdown formatting like ```json, no greetings, no explanations.
-
-[Output Format]
-{{"name": "function_name", "parameters": {{"key": "value"}}}}
-
-[User Prompt]
-{prompt['prompt']}
-""")
+            text = (
+                "You are a strict AI assistant designed for "
+                "function calling.\n"
+                "Your task is to analyze the user's prompt "
+                "and generate a JSON "
+                "object to call the correct function.\n\n"
+                "[Available Functions]\n"
+                f"{json.dumps(self.functions, indent=2)}\n\n"
+                "[Rules]\n"
+                "1. You MUST choose one of the available functions.\n"
+                "2. You MUST extract the required parameters based on "
+                "the function's definition.\n"
+                "3. You MUST respond ONLY with a valid JSON object. "
+                "No markdown formatting like "
+                "```json, no greetings, no explanations.\n\n"
+                "[Output Format]\n"
+                '{"name": "function_name", "parameters": {"key": "value"}}\n\n'
+                "[User Prompt]\n"
+                f"{prompt['prompt']}"
+                )
+            self.main_prompts.append(text)
 
     def _gen_pre_output(self) -> None:
         """プロンプトによって変わらない出力フォーマットを用意する"""
@@ -96,15 +101,16 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
     def _gen_str_tokens(self) -> None:
         self.str_tokens: list[int] = []
         self.dquote_token: list[int] = []
-        self.str_end_token_1: list[int] = []
-        self.str_end_token_2: list[int] = []
         for id, token in self.id_to_token.items():
-            if '"' == token:
-                self.dquote_token.append(id)
-            # elif token == '"}':
-            #     self.str_end_token_1.append(id)
-            # elif token == '",':
-            #     self.str_end_token_2.append(id)
+            if '"' in token:
+                if '"' == token:
+                    self.dquote_token.append(id)
+                elif r'\"' in token:
+                    self.str_tokens.append(id)
+                elif token == '"}':
+                    self.str_tokens.append(id)
+                elif token == '",':
+                    self.str_tokens.append(id)
             else:
                 self.str_tokens.append(id)
         # for id, token in self.id_to_token.items():
@@ -126,7 +132,7 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
                 print(json.dumps(self.output, indent=4))
                 print('---------------------')
                 print()
-                # sys.exit(1)
+            self._gen_output_file()
         except Exception as e:
             print(e)
             for object in self.output:
@@ -254,8 +260,8 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
             # bool
             if (self.model.decode([prev_tokens[-1]]) == '":' and
                     self.model.decode([token]) == ' boolean'):
-                possible_paths = (self.model.encode('"true"').tolist()[0] +
-                                  self.model.encode('"false"').tolist()[0])
+                possible_paths = ([self.model.encode('true').tolist()[0]] +
+                                  [self.model.encode('false').tolist()[0]])
                 while possible_paths:
                     # 各boolトークンリストの先頭のみ抜粋
                     allowed_token = list(set(path[0]
@@ -274,7 +280,7 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
             # null
             if (self.model.decode([prev_tokens[-1]]) == '":' and
                     self.model.decode([token]) == ' null'):
-                null_tokens = self.model.encode('"null"').tolist()[0]
+                null_tokens = self.model.encode('null').tolist()[0]
                 for token in null_tokens:
                     _ = yield [token]
                 continue
@@ -290,3 +296,7 @@ Your task is to analyze the user's prompt and generate a JSON object to call the
             **model_result
         }
         self.output.append(json_object)
+
+    def _gen_output_file(self) -> None:
+        with open(self.output_path, "w", encoding="utf-8") as f:
+            json.dump(self.output, f, indent=4)
