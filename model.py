@@ -86,9 +86,6 @@ class LimitationModel():
         text.append('}\n}')
         encode_text = self.model.encode("".join(text)).tolist()[0]
         self.post_funtion_ouput: list[int] = encode_text
-        # for token in self.post_funtion_ouput:
-        #     print(self.model.decode([token]))
-        # sys.exit(1)
 
     def _gen_param_tokens(self) -> None:
         self._gen_num_tokens()
@@ -113,12 +110,6 @@ class LimitationModel():
                     self.str_tokens.append(id)
             else:
                 self.str_tokens.append(id)
-        # for id, token in self.id_to_token.items():
-        #     if '"' in token:
-        #         if token == '"':
-        #             self.dquote_tokens.append(id)
-        #     else:
-        #         self.str_tokens.append(id)
 
     def run(self) -> None:
         try:
@@ -158,9 +149,7 @@ class LimitationModel():
             logits = self.model.get_logits_from_input_ids(tokens)
 
             print('arryに')
-            # logits_arr = np.array(logits)
             # ソートで昇順に
-            # top_indices = np.argsort(logits_arr)[-5:][::-1]
 
             top_indices = sorted(range(len(logits)),
                                  key=lambda i: logits[i], reverse=True)[:5]
@@ -182,7 +171,6 @@ class LimitationModel():
             top_indices = sorted(range(len(logits)),
                                  key=lambda i: logits[i], reverse=True)[:5]
 
-            # top_indices = np.argsort(masked)[-5:][::-1]
             print("\n--- postトークン ---")
             for idx in top_indices:
                 token_str = self.model.decode([idx])
@@ -192,7 +180,6 @@ class LimitationModel():
             # 一番スコアが高い「次の一文字（ID）」を決める
             print('一番スコアが高い「次の一文字（ID）」を決める')
             next_token_id = logits.index(max(logits))
-            # next_token_id = int(np.argmax(masked))
             self.current_result.append(next_token_id)
 
             # トークンを選択
@@ -228,10 +215,6 @@ class LimitationModel():
         self._gen_post_output()
         prev_tokens: list[int] = [self.post_funtion_ouput[0]]
         iter_post_output = iter(self.post_funtion_ouput)
-        # for token in self.post_funtion_ouput:
-        #     print(self.model.decode([token]))
-        # print(self.model.decode(self.current_result))
-        # sys.exit(1)
         for token in iter_post_output:
             # number
             if (self.model.decode([prev_tokens[-1]]) == '":' and
