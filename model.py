@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Call Me Maybe プロジェクトのメイン実行スクリプト。."""
 
 import argparse
 import json
@@ -10,7 +11,12 @@ from pathlib import Path
 
 
 class LimitationModel():
+    """Class to control LLM output and generate formatted JSON."""
+    # LLMの出力を制御し、指定されたフォーマットのJSONを生成するクラス。
+
     def __init__(self, args: argparse.Namespace) -> None:
+        """Initialize the model and input data."""
+        # モデルと入力データを初期化する。
         f_text = args.functions_definition.read_text(encoding="utf-8")
         i_text = args.input.read_text(encoding="utf-8")
 
@@ -31,6 +37,8 @@ class LimitationModel():
         self._gen_param_tokens()
 
     def _get_fn_tokens(self) -> None:
+        """Create a list of token IDs for function names."""
+        # 関数名のトークンIDリストを作成する。
         self.fn_tokens: list[list[int]] = []
 
         for fn in self.functions:
@@ -38,6 +46,8 @@ class LimitationModel():
                 self.model.encode(fn['name'] + '"').tolist()[0])
 
     def _gen_prompt(self) -> None:
+        """Generate the main prompt for the LLM."""
+        # LLMに入力するメインプロンプトを生成する。
         self.main_prompts: list[str] = []
 
         for prompt in self.inputs:
@@ -64,12 +74,14 @@ class LimitationModel():
             self.main_prompts.append(text)
 
     def _gen_pre_output(self) -> None:
-        """プロンプトによって変わらない出力フォーマットを用意する"""
+        """Prepare the format for the beginning of the JSON."""
+        # JSONの先頭部分のフォーマットを準備する。
         text = '{\n\t"name": "'
         self.pre_funtion_ouput: list[int] = self.model.encode(text).tolist()[0]
 
     def _gen_post_output(self) -> None:
-        """選ばれた関数によって変わる変数名と変数の数で出力フォーマットを作成する"""
+        """Prepare the format for the parameters section."""
+        # 引数（parameters）部分のフォーマットを準備する。
         text = [',\n\t"parameters": {"']
         chose_fn = "".join(
             self.model.decode(self.current_result)).split('"')[-2]
@@ -88,14 +100,20 @@ class LimitationModel():
         self.post_funtion_ouput: list[int] = encode_text
 
     def _gen_param_tokens(self) -> None:
+        """Create token lists of allowed characters and numbers for values."""
+        # 値として許可する文字・数字のトークンリストを作成する。
         self._gen_num_tokens()
         self._gen_str_tokens()
 
     def _gen_num_tokens(self) -> None:
+        """Create an allowed token list for numbers."""
+        # 数値用の許可トークンリストを作成する。
         nm = ['-', '.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
         self.num_tokens = [self.token_to_id[token] for token in nm]
 
     def _gen_str_tokens(self) -> None:
+        """Create a safe allowed token list for strings."""
+        # 文字列用の安全な許可トークンリストを作成する。
         self.str_tokens: list[int] = []
         self.dquote_token: list[int] = []
         for id, token in self.id_to_token.items():
@@ -112,6 +130,8 @@ class LimitationModel():
                 self.str_tokens.append(id)
 
     def run(self) -> None:
+        """Execute the generation process for all prompts."""
+        # すべてのプロンプトに対して生成プロセスを実行する。
         try:
             for main_prompt, prompt in zip(self.main_prompts, self.inputs):
                 print('-------- run --------')
@@ -133,6 +153,8 @@ class LimitationModel():
             sys.exit(1)
 
     def _run_model(self, prompt: str) -> None:
+        """Manipulate logits to force the LLM to output the next token."""
+        # ロジットを操作し、LLMに次のトークンを出力させる。
         self.current_result: list[int] = []
         tokens: list[int] = []
         tokens = self.model.encode(prompt).tolist()[0]
@@ -194,6 +216,8 @@ class LimitationModel():
             tokens.append(next_token_id)
 
     def _status_manager(self) -> Generator[list[int], int, None]:
+        """State machine managing the next allowed tokens."""
+        # 次に出力可能なトークンを管理するステートマシン。
         for token in self.pre_funtion_ouput:
             chosen_token = yield [token]
 
@@ -272,6 +296,8 @@ class LimitationModel():
             prev_tokens.append(prev_token)
 
     def _gen_output(self, prompt: dict[str, str]) -> None:
+        """Convert the generated result to a json and append to the list."""
+        # 生成された結果をjsonオブジェクトに変換し、リストに追加する。
         model_result = json.loads(
             "".join(self.model.decode(self.current_result)))
         json_object: dict[str, str | int] = {
@@ -281,5 +307,7 @@ class LimitationModel():
         self.output.append(json_object)
 
     def _gen_output_file(self) -> None:
+        """Save the final results as a JSON file."""
+        # 最終結果をJSONファイルとして保存する。
         with open(self.output_path, "w", encoding="utf-8") as f:
             json.dump(self.output, f, indent=4)

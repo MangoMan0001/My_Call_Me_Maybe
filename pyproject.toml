@@ -7,22 +7,17 @@ requires-python = ">=3.14"
 dependencies = [
     "flake8>=7.3.0",
     "flake8-bugbear>=25.11.29",
+	"flake8-docstrings",
+	"flake8-pyproject",
     "llm-sdk",
     "mypy>=1.19.1",
     "numpy>=2.4.3",
     "pep8-naming>=0.15.1",
-    "pydantic>=2.12.5",
+    "pydantic>=2.12.5"
 ]
-# flake8-docstrings　後で入れる
 
-# PyTorchのCPU版をインストール
-# [[tool.uv.index]]
-# name = "pytorch-cpu"
-# url = "https://download.pytorch.org/whl/cpu"
-# explicit = true
 
 [tool.uv.sources]
-# torch = { index = "pytorch-cpu" }
 llm-sdk = { workspace = true }
 
 # llm_sdkの中のpyproject.tomlの内容も含める
@@ -53,3 +48,14 @@ disallow_untyped_defs = true
 check_untyped_defs = true
 
 # strict = true
+
+[tool.flake8]
+docstring-convention = "google"
+exclude = [
+    ".git",
+    "__pycache__",
+    "venv",
+    ".venv",
+    "test.py",
+    "__init__.py"
+]

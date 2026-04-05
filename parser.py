@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Validation module for input files and JSON schemas."""
+# 入力ファイルとJSONスキーマのバリデーションモジュール。
 
 from pydantic import BaseModel, ValidationError
 import argparse
@@ -7,6 +9,8 @@ import json
 
 
 class ValidateFunction(BaseModel):
+    """Pydantic model for validating function definitions."""
+    # 関数定義を検証するためのPydanticモデル。
     name: str
     description: str
     parameters: dict[str, dict[str, str]]
@@ -14,10 +18,14 @@ class ValidateFunction(BaseModel):
 
 
 class ValidatePrompt(BaseModel):
+    """Pydantic model for validating user prompts."""
+    # ユーザープロンプトを検証するためのPydanticモデル。
     prompt: str
 
 
 def validation(args: argparse.Namespace) -> None:
+    """Read files and validate JSON data against schemas."""
+    # ファイルを読み込み、JSONデータがスキーマに合致するか検証する。
     try:
         f_text = args.functions_definition.read_text(encoding="utf-8")
         i_text = args.input.read_text(encoding="utf-8")
