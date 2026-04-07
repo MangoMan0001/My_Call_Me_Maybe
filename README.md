@@ -3,108 +3,104 @@
 # Call Me Maybe
 
 ### Description
-自然言語のプロンプトを解析し、LLM（大規模言語モデル）に構造化された関数呼び出し（JSON形式）を生成させるプログラムです。
-LLMの出力確率（Logits）をトークンごとに直接操作する「制約付きデコーディング（Constrained Decoding）」を用いて、自然言語ではなくJSONオブジェクトを生成することを目的としています。
+This program analyzes natural language prompts and forces a Large Language Model (LLM) to generate structured function calls in JSON format. By utilizing "Constrained Decoding"—a technique that directly manipulates the LLM's output probabilities (logits) token by token—the program guarantees the generation of valid JSON objects instead of unstructured natural language.
 
-ディレクトリ構成
+
+Directory Structure
 ```
 .
-.
 ├── Makefile
-├── README.md
-├── README_ja.md          # 日本語ドキュメント
-├── pyproject.toml        # 依存ライブラリやリンター(flake8, mypy)の設定
+├── README.md             # English documentation (This file)
+├── README_ja.md          # Japanese documentation
+├── pyproject.toml        # Configuration for dependencies and linters (flake8, mypy)
+├── uv.lock
 │
 ├── src/
-│   ├── call_me_maybe.py  # エントリーポイント
-│   ├── model.py          # 制約付きデコーディングのコアロジックとステートマシン
-│   ├── parser.py         # Pydanticを用いた入力バリデーション
-│   └── utils.py          # 引数解析
+│   ├── call_me_maybe.py  # Entry point
+│   ├── model.py          # Core logic and state machine for constrained decoding
+│   ├── parser.py         # Input validation using Pydantic
+│   └── utils.py          # Argument parsing
 │
-├── llm_sdk/              # 提供されたLLM操作用ラッパー
+├── llm_sdk/              # Provided wrapper for LLM operations
 └── data/
-    ├── input/            # テスト用の関数定義とプロンプトJSON
-    └── output/           # 生成された結果の出力先
+    ├── input/            # Test function definitions and prompt JSONs
+    └── output/           # Destination for generated results
 ```
 
 ### Instructions
+This program requires Python 3.10 or higher. Package management is handled by uv.
 
-このプログラムは Python 3.10以上 での実行が前提です。パッケージ管理には uv を使用しています。
-
-1. **インストール**
+1. **installation**
 ```bash
 make install
 ```
-仮想環境（.venv）を構築し、pydantic や numpy などの必要な依存関係をインストールします。
-
-2. **実行**
+This builds the virtual environment (.venv) and installs necessary dependencies such as pydantic and numpy.
+2. **Excution**
 ```bash
 make run
 ```
-デフォルトの設定でプログラムが実行され、data/output/function_calls.json に結果が出力されます。
+Runs the program with default settings, outputting the results to data/output/function_calls.json.
 
 ```bash
 uv run python src/call_me_maybe.py -f edge_functions.json -i edge_inputs.json
 ```
 
 ```bash
--f or -functions_definition : 関数定義ファイルを指定
--i or –input : 入力ファイルを指定
--o or –output : 出力ファイルを指定
+-f or -functions_definition : function_definition_file
+-i or –input : input_file
+-o or –output : output_file
 ```
 使用可能なフラグ
 
 ```bash
 sorce .venv/bin/activate
 ```
-（プロジェクトのPDFに厳密に従って実行する場合は、事前に `source .venv/bin/activate` を実行して仮想環境を有効にしてください。仮想環境を終了するには、`deactivate` を実行してください。）
+(Note: If you wish to strictly follow the project's PDF and run commands manually, activate the virtual environment beforehand by running source .venv/bin/activate. To exit the virtual environment, run deactivate.)
 
-3. **他の `Makefile` コマンド**
+3. **Other `Makefile` Commands**
 ```bash
 make lint
 make lint-strict
 ```
-flake8 と mypy による静的型解析を実行します。
-
+Executes static type checking and style linting using flake8 and mypy.
 ```bash
 make debug
 ```
-pdb を使用したデバッグモードで実行します。
-
+Runs the program in debug mode using pdb.
 ```bash
 make clean
 ```
-キャッシュファイルを削除します。
-仮想環境の削除も含むfcleanも同様に使用できます。
-
+Removes cache files. You can also use make fclean which additionally removes the virtual environment.
 ## Additional sections
 
-### Algorithm explanation（アルゴリズムの解説）
-プロンプトにモデルから選択されたトークンを繋げていく言語生成の流れの中、選択されるトークンをプログラムから制限することで出力をコントロールしています。出力したいフォーマットはプロンプトによってほぼ変化しません。なのでそのフォーマットではないものを弾くことで大まかな出力はコントロールできます。難しいのは関数名や引数の値とその型です。関数名はモデルがトークン化できる最小単位を２次元リストとして管理することで、インデックスで選ばれる関数を絞り込むように制御することができます。引数は関数が決まれば型も決まるためNUMBERであれば-や0~9と使用できるトークンを絞り込むことができます。あとはトークンの区切り方の癖に気をつけながらJSONの形が崩れないように作りました。
+### Algorithm explanation
+In the standard natural language generation process, the model selects tokens and appends them to the prompt. This program controls the output by programmatically restricting which tokens the model is allowed to select at any given step.
 
-## Design decisions（設計の決定事項）
-課題より指定もありましたが、バリデーションにおいてはPydanticを使用しています。
-引数取得はargparse、計算速度向上のためのNumpyを使用しています。
-しかし、このプログラムにおいてのボトルネックは事前に用意されていた__init__.pyに含まれる関数の実行速度にあったため課題全体での実行速度には寄与していません。
+Since the desired output format (JSON structure) remains mostly identical regardless of the prompt, we can control the macro-structure by rejecting tokens that deviate from this format. The true challenge lies in controlling the function names, argument values, and their specific types.
+To manage function names, we process the smallest tokenizable units as a 2D list, allowing the state machine to narrow down the selected function by index. Once a function is determined, its argument types are strictly fixed. For instance, if an argument is a NUMBER, we can restrict the allowed tokens exclusively to - and 0-9. Finally, the algorithm carefully accounts for the tokenizer's specific chunking habits to ensure the JSON syntax never breaks.
 
-## Performance analysis（パフォーマンス分析）
-制約付きデコーディングの制御により、指定されたスキーマに合致するJSONを生成します。
-速度に関しては前述の通り__init__.pyの実行スピードを上回っています。
-テスト開発環境では１関数につき1分の処理スピードです。
+## Design decisions
+As specified by the assignment requirements, we utilized Pydantic for rigorous input validation. Argparse is used for fetching command-line arguments, and Numpy is implemented to optimize calculation speeds during logit manipulation.
+However, it should be noted that the primary performance bottleneck in this program lies within the execution speed of the pre-provided functions inside llm_sdk/__init__.py. Therefore, our internal optimizations do not drastically affect the overall execution time of the project.
 
-## Challenges faced（直面した課題と解決策）
-Pythonのjson.loadsによってエスケープが消費され、LLMに「生の改行」や「素のダブルクォート」が渡されることでJSONが破壊される問題に直面しました。これに対し、特定の文字を含むトークンを絶対拒絶リストに追加することで解決しました。
+## Performance analysis
+Thanks to the strict control imposed by constrained decoding, the system consistently generates JSON that 100% matches the specified schema.
+Regarding execution speed, as mentioned above, it is bound by the llm_sdk execution speed. In our testing and development environment, the processing speed averages around 1 minute per function call.
+
+## Challenges faced
+During development, we faced a critical issue where Python's json.loads inherently consumed escape characters. This resulted in passing "raw newlines" or "unescaped double quotes" directly to the LLM, which physically broke the output JSON syntax.
+We resolved this by creating an absolute rejection list (shield) that permanently blocks tokens containing these specific, dangerous characters from ever being selected.
 
 ## Testing strategy（テスト戦略）
-提供された標準テストに加え、以下の「Edgeケース」を含む独自のテスト用JSONを使用しました。
-- 空文字や極端に長い文字列
-- 特殊記号や絵文字（👾）、エスケープ文字の連続
-- スキーマと異なる型を要求する「意地悪なプロンプト（Wrong types）」
-- 曖昧で関数を特定しづらいプロンプト
+In addition to the provided standard tests, we validated the robustness of the implementation using custom test JSONs containing extreme "Edge cases," including:
+- Empty strings and extremely long strings.
+- Consecutive special symbols, emojis (👾), and escape characters.
+- "Mean prompts (Wrong types)" that intentionally request data types different from the schema.
+- Ambiguous prompts where identifying the correct function is logically difficult.
 
 ### Resources
 
 AI
-- 制約付きデコーディングにおけるLogits操作のアルゴリズム設計とデバッグの壁打ち。
-- `flake8` および `mypy` のエラーログ解析と `pyproject.toml` の最適化。
-- DocstringおよびREADMEの英訳、構成支援。
+- Used as a sounding board for designing the algorithm and debugging the Logits manipulation in constrained decoding.
+- Assisted in analyzing flake8 and mypy error logs, and optimizing the pyproject.toml configuration.
+- Provided support for English translation and structural formatting of Docstrings and this README.

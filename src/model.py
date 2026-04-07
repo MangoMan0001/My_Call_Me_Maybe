@@ -122,9 +122,9 @@ class LimitationModel():
                     self.dquote_token.append(id)
                 elif r'\"' in token:
                     self.str_tokens.append(id)
-                elif token == '"}':
+                elif token.endswith('"}'):
                     self.str_tokens.append(id)
-                elif token == '",':
+                elif token.endswith('",'):
                     self.str_tokens.append(id)
             else:
                 self.str_tokens.append(id)
