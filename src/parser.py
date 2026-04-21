@@ -38,18 +38,22 @@ def validation(args: argparse.Namespace) -> None:
         functions = json.loads(f_text)
         prompts = json.loads(i_text)
 
+        # JSONを構造ごとにバリデーション
         for fn in functions:
             ValidateFunction(**fn)
         for pm in prompts:
             ValidatePrompt(**pm)
 
+    # JSON構文エラー
     except json.JSONDecodeError as e:
-        print(f"Error: JSONファイルの形式が間違っておりますわ！\n詳細: {e}")
+        print(f"Error: JSON file format is incorrect.: {e}")
         sys.exit(1)
+    # JSONのキーとバリューのエラー
     except ValidationError as e:
-        print(f"Error: データのルール（スキーマ）違反ですわ！\n詳細:\n{e}")
+        print(f"Error: Data does not comply with the formatting rules.: {e}")
         sys.exit(1)
 
+    # 以下 File Path Error
     except FileNotFoundError as e:
         print(e)
         sys.exit(1)

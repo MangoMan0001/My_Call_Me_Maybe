@@ -32,10 +32,6 @@ run: ## メインプログラムを実行
 	@echo "Running $(NAME)..."
 	uv run python $(MAIN_DERECTRY)/$(MAIN_SCRIPT)
 
-edge: ## メインプログラムを実行
-	@echo "Running $(NAME)..."
-	uv run python $(MAIN_DERECTRY)/$(MAIN_SCRIPT) -f edge_functions.json -i edge_inputs.json
-
 debug: ## pdbデバッガを使って実行
 	@echo "Debugging $(NAME)..."
 	uv run python -pdb $(MAIN_DERECTRY)/$(MAIN_SCRIPT)
@@ -66,12 +62,12 @@ clean: ## 一時ファイルやキャッシュを削除
 	@rm -rf build
 	@rm -rf *.egg-info
 	@rm -rf .ruff_cache
+	@rm -rf data/output
 	@echo "Clean complete."
 
 fclean: clean ## cleanに加えて仮想環境も削除
 	@echo "Full Cleaning up..."
 	@rm -rf .venv
-	@rm -rf uv.lock
 	@rm -rf ~/.cache/huggingface/hub/
 	@echo "Full Clean complete."
 

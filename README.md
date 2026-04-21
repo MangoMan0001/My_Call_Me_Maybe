@@ -50,7 +50,7 @@ uv run python src/call_me_maybe.py -f edge_functions.json -i edge_inputs.json
 -i or –input : input_file
 -o or –output : output_file
 ```
-使用可能なフラグ
+Available flags
 
 ```bash
 sorce .venv/bin/activate
@@ -91,12 +91,33 @@ Regarding execution speed, as mentioned above, it is bound by the llm_sdk execut
 During development, we faced a critical issue where Python's json.loads inherently consumed escape characters. This resulted in passing "raw newlines" or "unescaped double quotes" directly to the LLM, which physically broke the output JSON syntax.
 We resolved this by creating an absolute rejection list (shield) that permanently blocks tokens containing these specific, dangerous characters from ever being selected.
 
-## Testing strategy（テスト戦略）
+## Testing strategy
 In addition to the provided standard tests, we validated the robustness of the implementation using custom test JSONs containing extreme "Edge cases," including:
 - Empty strings and extremely long strings.
 - Consecutive special symbols, emojis (👾), and escape characters.
 - "Mean prompts (Wrong types)" that intentionally request data types different from the schema.
 - Ambiguous prompts where identifying the correct function is logically difficult.
+
+## Example
+```
+1. Request logits
+--- Pre Limit Token ---
+ID:   5209 | Score:   18.86 | Token: ' Please'
+ID:   4710 | Score:   17.98 | Token: ' \n\n'
+ID:    220 | Score:   17.57 | Token: ' '
+ID:   3555 | Score:   17.00 | Token: ' What'
+ID:   7281 | Score:   16.89 | Token: ' Also'
+2. <<< Constrain logits >>>
+--- Post Limit Token ---
+ID:    515 | Score:    4.81 | Token: '{\n'
+ID:      0 | Score:    -inf | Token: '!'
+ID:      1 | Score:    -inf | Token: '"'
+ID:      2 | Score:    -inf | Token: '#'
+ID:      3 | Score:    -inf | Token: '$'
+3. Select the token with the highest score
+4. Generate the restriction token to be used next
+```
+The constraint decoding is split into the current state for each token and outputted.
 
 ### Resources
 

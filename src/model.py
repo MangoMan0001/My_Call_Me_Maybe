@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Call Me Maybe プロジェクトのメイン実行スクリプト。."""
+"""The main execution script for the Call Me Maybe project."""
 
 import argparse
 import json
@@ -41,6 +41,7 @@ class LimitationModel():
         # 関数名のトークンIDリストを作成する。
         self.fn_tokens: list[list[int]] = []
 
+        # 各関数名のおわりをダブルクォーテーションで判断する
         for fn in self.functions:
             self.fn_tokens.append(
                 self.model.encode(fn['name'] + '"').tolist()[0])
@@ -83,8 +84,10 @@ class LimitationModel():
         """Prepare the format for the parameters section."""
         # 引数（parameters）部分のフォーマットを準備する。
         text = [',\n\t"parameters": {"']
+        # モデルがどの関数を選んだかを現在の出力状況から抜き取る
         chose_fn = "".join(
             self.model.decode(self.current_result)).split('"')[-2]
+        # 選択された関数の引数名と型をtextに加える
         params: dict[str, str] = {}
         for fn in self.functions:
             if fn['name'] == chose_fn:
@@ -117,10 +120,11 @@ class LimitationModel():
         self.str_tokens: list[int] = []
         self.dquote_token: list[int] = []
         for id, token in self.id_to_token.items():
+            # ダブルクォーテーションが含まれるトークンを制限する
             if '"' in token:
                 if '"' == token:
                     self.dquote_token.append(id)
-                elif r'\"' in token:
+                elif r'\"' in token:  # raw == エスケープではない
                     self.str_tokens.append(id)
                 elif token.endswith('"}'):
                     self.str_tokens.append(id)
@@ -158,61 +162,54 @@ class LimitationModel():
         self.current_result: list[int] = []
         tokens: list[int] = []
         tokens = self.model.encode(prompt).tolist()[0]
-
         state_gen = self._status_manager()
-
         try:
             allowed_tokens = next(state_gen)
         except StopIteration:
             return
+
         while True:
-            # logitsを要求
-            print('logitsを要求')
+            print('1. Request logits')
             logits = self.model.get_logits_from_input_ids(tokens)
 
-            print('arryに')
-            # ソートで昇順に
-
+            print("--- Pre Limit Token ---")
             top_indices = sorted(range(len(logits)),
                                  key=lambda i: logits[i], reverse=True)[:5]
-
-            print("\n--- preトークン ---")
             for idx in top_indices:
-                token_str = self.model.decode([idx])
+                token_str = self.model.decode([idx]).replace('\n', '\\n')
                 score = logits[idx]
-                print(f"ID: {idx:6} | スコア: {score:7.2f} | トークン: '{token_str}'")
+                print(f"ID: {idx:6} | "
+                      f"Score: {score:7.2f} | Token: '{token_str}'")
 
-            # 状態分けでlogitsの中身を変更
-            print('状態分けでlogitsの中身を変更')
+            print('2. <<< Constrain logits >>>')
+            # logitsのリストをNumpy配列に変換
             original = np.array(logits)
+            # すべてを-infにしたもう一つの配列を作成
             masked = np.full_like(original, -np.inf)
+            # 許可されたインデックスのみModelが出力したスコアを代入
             masked[allowed_tokens] = original[allowed_tokens]
+            # 通常のリストに戻して元のlogitsへ代入
             logits[:] = masked.tolist()
 
-            # ソートで昇順に
+            print("--- Post Limit Token ---")
             top_indices = sorted(range(len(logits)),
                                  key=lambda i: logits[i], reverse=True)[:5]
-
-            print("\n--- postトークン ---")
             for idx in top_indices:
-                token_str = self.model.decode([idx])
+                token_str = self.model.decode([idx]).replace('\n', '\\n')
                 score = logits[idx]
-                print(f"ID: {idx:6} | スコア: {score:7.2f} | トークン: '{token_str}'")
+                print(f"ID: {idx:6} | "
+                      f"Score: {score:7.2f} | Token: '{token_str}'")
 
-            # 一番スコアが高い「次の一文字（ID）」を決める
-            print('一番スコアが高い「次の一文字（ID）」を決める')
+            print('3. Select the token with the highest score')
             next_token_id = logits.index(max(logits))
             self.current_result.append(next_token_id)
 
-            # トークンを選択
-            print('トークンを選択')
+            # 制限トークンを生成
             try:
                 allowed_tokens = state_gen.send(next_token_id)
+                print('4. Generate the restriction token to be used next\n')
             except StopIteration:
                 break
-
-            # 終了じゃなければ、出力済みの配列に付け足して、次のループへ！
-            print('終了じゃなければ、出力済みの配列に付け足して、次のループへ！')
             tokens.append(next_token_id)
 
     def _status_manager(self) -> Generator[list[int], int, None]:
