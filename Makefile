@@ -55,7 +55,7 @@ lint-strict: ## より厳しいMypyチェックを実行
 clean: ## 一時ファイルやキャッシュを削除
 	@echo "Cleaning up..."
 	@rm -rf __pycache__
-	@rm -rf **/__pycache__
+	@find . -type d -name "__pycache__" -exec rm -rf {} +
 	@rm -rf .mypy_cache
 	@rm -rf .pytest_cache
 	@rm -rf dist
