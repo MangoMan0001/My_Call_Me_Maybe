@@ -117,18 +117,27 @@ class LimitationModel():
     def _gen_str_tokens(self) -> None:
         """Create a safe allowed token list for strings."""
         # 文字列用の安全な許可トークンリストを作成する。
+        json_escapes = {
+            r'\\', r'\/', r'\"', r'\b', r'\f', r'\n', r'\r', r'\t', r'\u'
+        }
         self.str_tokens: list[int] = []
         self.dquote_token: list[int] = []
         for id, token in self.id_to_token.items():
             # ダブルクォーテーションが含まれるトークンを制限する
-            if '"' in token:
-                if '"' == token:
+            if '/' in token:
+                self.str_tokens.append(id)
+            elif '"' in token:
+                if token == '"':
                     self.dquote_token.append(id)
                 elif r'\"' in token:  # raw == エスケープではない
                     self.str_tokens.append(id)
                 elif token.endswith('"}'):
                     self.str_tokens.append(id)
                 elif token.endswith('",'):
+                    self.str_tokens.append(id)
+            # バックスラッシュの含まれるトークンを制限する
+            elif '\\' in token:
+                if any(escape_char in token for escape_char in json_escapes):
                     self.str_tokens.append(id)
             else:
                 self.str_tokens.append(id)
@@ -239,7 +248,8 @@ class LimitationModel():
         for token in iter_post_output:
             # number
             if (self.model.decode([prev_tokens[-1]]) == '":' and
-                    self.model.decode([token]) == ' number'):
+                    (self.model.decode([token]) == ' number' or
+                     self.model.decode([token]) == ' integer')):
                 next_token = next(iter_post_output)
                 while True:
                     chosen_token = yield self.num_tokens + [next_token]

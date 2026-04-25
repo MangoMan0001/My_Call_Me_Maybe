@@ -2,9 +2,9 @@
 """Main execution script for the project."""
 # プロジェクトのメイン実行スクリプト。
 
-from utils import get_args
-from parser import validation
-from model import LimitationModel
+from .utils import get_args
+from .parser import validation
+from .model import LimitationModel
 
 
 def main() -> None:
